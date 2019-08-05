@@ -12,6 +12,9 @@ import argparse
 import logging
 import prettytable
 import time
+import json
+from urllib.parse import unquote
+from flask import Flask, request
 
 from drqa.reader import Predictor
 
@@ -62,23 +65,32 @@ if args.cuda:
 
 def process(document, question, candidates=None, top_n=1):
     t0 = time.time()
+    document = unquote(document)
+    question = unquote(question)
+    predictions_list = {'predictions':[], 'status':1}
     predictions = predictor.predict(document, question, candidates, top_n)
-    table = prettytable.PrettyTable(['Rank', 'Span', 'Score'])
     for i, p in enumerate(predictions, 1):
-        table.add_row([i, p[0], p[1]])
-    print(table)
-    print('Time: %.4f' % (time.time() - t0))
+        predictions_list['predictions'].append({'answer':p[0], 'score':str(p[1])})
+    predictions_list['time'] = '%.4f' % (time.time() - t0)
+    return json.dumps(predictions_list)
 
 
-banner = """
-DrQA Interactive Document Reader Module
->> process(document, question, candidates=None, top_n=1)
->> usage()
-"""
+app = Flask(__name__)
+
+@app.route('/predict', methods=['POST'])
+def predict():
+  document = request.form['document']
+  question = request.form['question']
+
+  status = process(document, question)
+  return status
+
+app.run(host="0.0.0.0", port=5000)
+
+#banner = json.dumps({"status":"ready"})
+
+#def usage():
+#    print(banner)
 
 
-def usage():
-    print(banner)
-
-
-code.interact(banner=banner, local=locals())
+#code.interact(banner=banner, local=locals())
